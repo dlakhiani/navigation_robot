@@ -9,7 +9,9 @@ _This blog uses Ubuntu 18.04 with ROS Melodic and Gazebo 9. We assume that you h
 Before we begin this tutorial, you can view the full project in docker!
 
 - Make sure you have [docker](https://docs.docker.com/engine/install/) and [docker-compose](https://docs.docker.com/compose/install/) on your OS.
-- Clone and launch
+  - `docker -v`
+  - `docker-compose --version`
+- Open a new terminal. Clone the repo below:
   ```
   $ cd ~
   $ git clone https://github.com/dlakhiani/ros-navigation-local.git
