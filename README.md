@@ -4,6 +4,30 @@ Simulated environment in which programmers are able to interact and experiment w
 
 _This blog uses Ubuntu 18.04 with ROS Melodic and Gazebo 9. We assume that you have ROS and Gazebo already installed on your local system._
 
+## Installing Nvidia
+
+This project makes use of Nvidia hardware to lower resource consumption and make the simulation run smoothly!
+
+### Nvidia Driver
+
+```bash
+sudo apt-get install nvidia-driver-470
+sudo apt-get install nvidia-cuda-toolkit
+nvcc --version
+```
+
+### Runtime Container
+
+```bash
+distribution=$(. /etc/os-release;echo $ID$VERSION_ID) \
+   && curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add - \
+   && curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+sudo apt-get update
+sudo apt-get install -y nvidia-docker2
+sudo systemctl restart docker
+nvidia-smi
+```
+
 ## Launch in Docker
 
 Before we begin this tutorial, you can view the full project in docker!
@@ -12,15 +36,16 @@ Before we begin this tutorial, you can view the full project in docker!
   - `docker -v`
   - `docker-compose --version`
 - Open a new terminal. Clone the repo below:
-  ```
+  ```bash
   cd ~
   git clone https://github.com/dlakhiani/ros-navigation-local.git
   cd ros-navigation-local/src
+  xhost local:docker
   docker-compose -f docker-compose.nvidia.yml build
   docker-compose -f docker-compose.nvidia.yml up
   ```
 - To control the robot, open a new terminal and type:
-  ```
+  ```bash
   docker exec -it src_ros-develop_1 bash
   source devel/setup.bash
   roslaunch turtlebot_teleop keyboard_teleop.launch
@@ -29,7 +54,7 @@ Before we begin this tutorial, you can view the full project in docker!
 ## Workspace and project
 
 - Feel free to skip this if you already have setup a workspace, if not:
-  ```
+  ```bash
   source /opt/ros/$ROS_DISTRO/setup.bash
   mkdir -p ~/sim_ws/src
   cd ~/sim_ws/src
@@ -39,7 +64,7 @@ Before we begin this tutorial, you can view the full project in docker!
   source ~/sim_ws/devel/setup.bash
   ```
 - Lets create the project for this tutorial:
-  ```
+  ```bash
   cd ~/sim_ws/src
   catkin_create_pkg navigation_robot gazebo_ros urdf
   ```
@@ -59,7 +84,7 @@ Before we begin this tutorial, you can view the full project in docker!
 A world in gazebo is just another word for a simulated environment for your experiments. Programmers can evaluate and test their robot in difficult or dangerous scenarios without any harm to the robot themselves.
 
 - An equivalent method of creating an empty world in gazebo is using the `.world` file.
-  ```
+  ```bash
   cd ~/sim_ws/src/navigation_robot
   mkdir world
   cd world
@@ -114,7 +139,7 @@ A world in gazebo is just another word for a simulated environment for your expe
 ## Spawn a Robot in Gazebo
 
 - Robots are like any other model, having multiple links, joints, plugins and, sensors. In this tutorial, we will spawn a **TurtleBot** !
-  ```
+  ```bash
   cd ~
   git clone https://github.com/dlakhiani/ros-navigation-local.git
   cd ros-navigation-local
@@ -180,7 +205,7 @@ All robot simulations make use of **XML**, especially the `.urdf` extension. The
 
 Earlier we worked with `.world` files to generate an environment for our robot. This time, we are going to customize it:
 
-```
+```bash
 cd ~/sim_ws/src/navigation_robot
 ```
 
@@ -222,7 +247,7 @@ cd ~/sim_ws/src/navigation_robot
 - Save this under `empty_world.world`
 - As it is a good practice to use a `.launch` file, we will create one now!
   - **LAUNCH** files are **XML** extensions that provide a convenient way to start up multiple nodes and a master, as well as other initialization factors.
-    ```
+    ```bash
     cd ~/sim_ws/src/navigation_robot
     mkdir launch
     cd launch
