@@ -44,6 +44,7 @@ Before we begin this tutorial, you can view the full project in docker!
   docker-compose -f docker-compose.nvidia.yml build
   docker-compose -f docker-compose.nvidia.yml up
   ```
+  > _Please do be patient when loading Gazebo, as it will take a bit of time due to it being a graphical client._
 - To control the robot, open a new terminal and type:
   ```bash
   docker exec -it src_ros-develop_1 bash
