@@ -202,6 +202,30 @@ A world in gazebo is just another word for a simulated environment for your expe
 
 All robot simulations make use of **XML**, especially the `.urdf` extension. The **URDF** (Universal Robot Description Format) model is a collection of **XML** files that describe a robot's physical description. These files are used by **ROS** (Robot Operating System) to tell the computer what the robot actually looks like in real life.
 
+## Launch in Docker
+
+For the customized simulation, you can view it in docker too!
+
+- Make sure you have [docker](https://docs.docker.com/engine/install/) and [docker-compose](https://docs.docker.com/compose/install/) on your OS.
+  - `docker -v`
+  - `docker-compose --version`
+- Open a new terminal. Clone the repo below:
+  ```bash
+  cd ~
+  git clone https://github.com/dlakhiani/iris_model.git
+  cd iris_model
+  xhost local:docker
+  docker-compose -f docker-compose.yml build
+  docker-compose -f docker-compose.yml up
+  ```
+  > _Please do be patient when loading Gazebo, as it will take a bit of time due to it being a graphical client._
+- To control the robot, open a new terminal and type:
+  ```bash
+  docker exec -it iris_model_ros-develop_1 bash
+  source devel/setup.bash
+  rosrun iris_model teleop_twist_key.py
+  ```
+
 ## Customize World
 
 Earlier we worked with `.world` files to generate an environment for our robot. This time, we are going to customize it:
