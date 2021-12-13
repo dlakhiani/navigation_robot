@@ -215,8 +215,8 @@ For the customized simulation, you can view it in docker too!
   git clone https://github.com/dlakhiani/iris_model.git
   cd iris_model
   xhost local:docker
-  docker-compose -f docker-compose.yml build
-  docker-compose -f docker-compose.yml up
+  docker-compose build
+  docker-compose up ros-develop-gmapping
   ```
   > _Please do be patient when loading Gazebo, as it will take a bit of time due to it being a graphical client._
 - To control the robot, open a new terminal and type:
@@ -300,3 +300,166 @@ cd ~/sim_ws/src/navigation_robot
 
 - This will execute a default launch file provided by _Gazebo_, load our world file and display the _Gazebo_ client. You can launch it by doing:
   - `roslaunch navigation_robot world.launch`
+
+## Build your own model
+
+The more accurate you want your model to be, the more time you would need to spend on the design. The most standard way to go about creating one is placing a **SDF** file in the `~/.gazebo/models` directory, however, we will be using our newly acquired knowledge on **URDF** in tandem with **Xacro** (XML Macro) to make shorter and clearer ROS descriptions.
+
+```bash
+cd ~/sim_ws/src/navigation_robot
+mkdir urdf
+cd urdf
+```
+
+Now, lets build a 4-wheel robot!
+
+- We will begin by building a blueprint for the wheels and chassis of the robot, and for that we will need a `.xacro` file to keep track of the macros!
+
+  ```bash
+  touch macros.xacro
+  ```
+
+- Paste the following in `macros.xacro`:
+
+  ```xml
+  <?xml version="1.0"?>
+  <robot name="macros" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <!--All units in m-kg-s-radians unit system -->
+    <xacro:property name="M_PI" value="3.1415926535897931" />
+    <xacro:property name="footprint_vertical_offset" value="-0.05" />
+
+    <!-- Chassis -->
+    <xacro:property name="chassis_height" value="0.1" />
+    <xacro:property name="chassis_width" value="0.5" />
+    <xacro:property name="chassis_length" value="0.6" />
+    <xacro:property name="chassis_mass" value="5" /> <!-- in kg-->
+
+    <!-- Wheels -->
+    <xacro:property name="wheel_horizontal_separation" value="0.15" />
+    <xacro:property name="wheel_vertical_separation" value="0.23" />
+    <xacro:property name="wheel_vertical_offset" value="-0.13" />
+    <xacro:property name="wheel_radius" value="0.098" />
+    <xacro:property name="wheel_width" value="0.040" />
+
+    <xacro:macro name="wheel" params="prefix trans_x trans_y trans_z">
+      <link name="${prefix}_wheel">
+        <visual>
+          <origin xyz="0 0 0" rpy="${M_PI/2} 0 0"/>
+          <geometry>
+            <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+          </geometry>
+          <material name="Red" />
+        </visual>
+        <collision>
+          <origin xyz="0 0 0" rpy="${M_PI/2} 0 0"/>
+          <geometry>
+            <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+          </geometry>
+        </collision>
+        <inertial>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <mass value="0.477"/>
+          <inertia
+            ixx="0.0013" ixy="0" ixz="0"
+            iyy="0.0024" iyz="0"
+            izz="0.0013"/>
+          </inertial>
+      </link>
+
+      <gazebo reference="${prefix}_wheel">
+        <material>Gazebo/DarkGrey</material>
+      </gazebo>
+
+      <joint name="${prefix}_joint" type="continuous">
+        <parent link="chassis_link"/>
+        <child link="${prefix}_wheel" />
+        <origin xyz="${trans_x} ${trans_y} ${trans_z}" rpy="0 0 0" />
+        <axis xyz="0 1 0" />
+      </joint>
+    </xacro:macro>
+
+    <xacro:macro name="cylinder_inertia" params="mass r l">
+      <inertia  ixx="${mass*(3*r*r+l*l)/12}" ixy = "0" ixz = "0"
+                iyy="${mass*(3*r*r+l*l)/12}" iyz = "0"
+                izz="${mass*(r*r)/2}" />
+    </xacro:macro>
+
+  </robot>
+  ```
+
+  - the term **xacro:property** defines a named value that can serve as a variable for **XML** documents.
+  - the term **xacro:macro** creates a unique named macro (XML tag) for a certain block of code, is similar to creating an object/class in programming (defining parameters and attributes of the object).
+  - the term **link** describes an element for ROS to create, often including properties of inertia, visuals and collision.
+  - the term **joint** describes the physical relation between links.
+  - the term **gazebo** describes how the _Gazebo_ simulator will present the given description.
+    > _more on [xacro](http://wiki.ros.org/xacro) and [URDF tags](http://wiki.ros.org/urdf/XML)._
+
+Great! We now have a blueprint for our components and some. Let's put it together in another `.xacro` file!
+
+```bash
+touch robot.xacro
+```
+
+- Paste the following in `robot.xacro`:
+
+  ```xml
+  <?xml version="1.0"?>
+
+  <robot name="navigation_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:include filename="$(find navigation_robot)/urdf/macros.xacro" />
+
+    <!-- base_link is a fictitious link(frame) that is on the ground right below chassis_link origin -->
+    <link name="base_link">
+      <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <box size="0.001 0.001 0.001" />
+      </geometry>
+      </visual>
+    </link>
+
+    <joint name="base_link_joint" type="fixed">
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <parent link="base_link"/>
+      <child link="chassis_link" />
+    </joint>
+
+    <!-- chassis_link is the centre frame that is essentially the body of the robot, serving as the main connector to all 4 wheels -->
+    <link name="chassis_link">
+      <visual>
+        <origin xyz="0 0 ${footprint_vertical_offset}" rpy="0 0 0"/>
+        <geometry>
+          <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+        </geometry>
+        <material name="Grey" />
+      </visual>
+      <collision>
+        <origin xyz="0 0 ${footprint_vertical_offset}"/>
+        <geometry>
+          <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+        </geometry>
+      </collision>
+      <inertial>
+      <!-- Center of mass -->
+      <origin xyz="0.012  0.002 0.067" rpy="0 0 0"/>
+      <mass value="16.523"/>
+      <!-- Moments of inertia: ( chassis without wheels ) -->
+      <inertia
+        ixx="0.3136" ixy="-0.0008" ixz="0.0164"
+        iyy="0.3922" iyz="-0.0009"
+        izz="0.4485"/>
+      </inertial>
+    </link>
+
+  <xacro:wheel prefix="front_left" trans_x="${wheel_horizontal_separation}" trans_y="${wheel_vertical_separation+wheel_width/2}" trans_z="${wheel_vertical_offset}"/>
+    <xacro:wheel prefix="front_right" trans_x="${wheel_horizontal_separation}" trans_y="${-wheel_vertical_separation-wheel_width/2}" trans_z="${wheel_vertical_offset}"/>
+    <xacro:wheel prefix="rear_left" trans_x="${-wheel_horizontal_separation}" trans_y="${wheel_vertical_separation+wheel_width/2}" trans_z="${wheel_vertical_offset}"/>
+    <xacro:wheel prefix="rear_right" trans_x="${-wheel_horizontal_separation}" trans_y="${-wheel_vertical_separation-wheel_width/2}" trans_z="${wheel_vertical_offset}"/>
+
+  </robot>
+  ```
+
+  > here we call on our macros from `macros.xacro` using `$()`, to help define our wheels and properties of the chassis in a concise manner!
+
+Now we have the description of our robot! All that remains is our `.gazebo` file, which will provide _Gazebo_ with the properties we want our robot to have in the simulation!
