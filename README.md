@@ -463,3 +463,28 @@ touch robot.xacro
   > here we call on our macros from `macros.xacro` using `$()`, to help define our wheels and properties of the chassis in a concise manner!
 
 Now we have the description of our robot! All that remains is our `.gazebo` file, which will provide _Gazebo_ with the properties we want our robot to have in the simulation!
+
+---
+
+<br>
+
+With the current knowledge of ROS and Gazebo at your disposal, localization is within your grasp! Being able to send goals and automate path building is one of many amazing things we want a robot to be able to do. So, lets try it now!
+
+## Launch in Docker
+
+For the localization simulation, its available in docker also!
+
+- Make sure you have [docker](https://docs.docker.com/engine/install/) and [docker-compose](https://docs.docker.com/compose/install/) on your OS.
+  - `docker -v`
+  - `docker-compose --version`
+- Open a new terminal. Clone the repo below:
+  ```bash
+  cd ~
+  git clone https://github.com/dlakhiani/iris_model.git
+  cd iris_model
+  xhost local:docker
+  docker-compose build
+  docker-compose up ros-develop-amcl
+  ```
+  > _Please do be patient when loading Gazebo, as it will take a bit of time due to it being a graphical client._
+- Now you can send it `Goals` using Rviz, and the robot will configure a path to get to the given destination goal!
