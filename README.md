@@ -452,6 +452,36 @@ touch robot.xacro
       </inertial>
     </link>
 
+  <joint name="joint_sensor_laser" type="fixed">
+    <origin xyz="0.15 0 0.05" rpy="0 0 0"/>
+    <parent link="chassis_link"/>
+    <child link="sensor_laser"/>
+  </joint>
+
+  <!-- laserscan! -->
+  <link name="sensor_laser">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="1" />
+      <xacro:cylinder_inertia mass="1" r="0.05" l="0.1" />
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <cylinder radius="0.05" length="0.1"/>
+      </geometry>
+      <material name="white" />
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.05" length="0.1"/>
+      </geometry>
+    </collision>
+  </link>
+
   <xacro:wheel prefix="front_left" trans_x="${wheel_horizontal_separation}" trans_y="${wheel_vertical_separation+wheel_width/2}" trans_z="${wheel_vertical_offset}"/>
     <xacro:wheel prefix="front_right" trans_x="${wheel_horizontal_separation}" trans_y="${-wheel_vertical_separation-wheel_width/2}" trans_z="${wheel_vertical_offset}"/>
     <xacro:wheel prefix="rear_left" trans_x="${-wheel_horizontal_separation}" trans_y="${wheel_vertical_separation+wheel_width/2}" trans_z="${wheel_vertical_offset}"/>
@@ -463,6 +493,133 @@ touch robot.xacro
   > here we call on our macros from `macros.xacro` using `$()`, to help define our wheels and properties of the chassis in a concise manner!
 
 Now we have the description of our robot! All that remains is our `.gazebo` file, which will provide _Gazebo_ with the properties we want our robot to have in the simulation!
+
+```bash
+touch robot.gazebo
+```
+
+- Paste the following in `robot.gazebo`:
+
+  ```xml
+  <?xml version="1.0"?>
+  <robot>
+
+    <gazebo reference="base_link">
+      <turnGravityOff>false</turnGravityOff>
+    </gazebo>
+
+    <gazebo reference="chassis_link">
+      <material>Gazebo/White</material>
+      <turnGravityOff>false</turnGravityOff>
+    </gazebo>
+
+    <gazebo reference="sensor_laser">
+      <material>Gazebo/Blue</material>
+      <sensor type="ray" name="head_hokuyo_sensor">
+        <pose>0 0 0 0 0 0</pose>
+        <visualize>true</visualize>
+        <update_rate>20</update_rate>
+        <ray>
+          <scan>
+            <horizontal>
+              <samples>720</samples>
+              <resolution>1</resolution>
+              <min_angle>-1.570796</min_angle>
+              <max_angle>1.570796</max_angle>
+            </horizontal>
+          </scan>
+          <range>
+            <min>0.10</min>
+            <max>10.0</max>
+            <resolution>0.01</resolution>
+          </range>
+          <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>0.01</stddev>
+          </noise>
+        </ray>
+        <plugin name="gazebo_ros_head_hokuyo_controller" filename="libgazebo_ros_laser.so">
+          <topicName>/navigation_robot/laser/scan</topicName>
+          <frameName>sensor_laser</frameName>
+        </plugin>
+      </sensor>
+    </gazebo>
+
+    <gazebo>
+      <plugin name="object_controller" filename="libgazebo_ros_planar_move.so">
+        <commandTopic>cmd_vel</commandTopic>
+        <odometryTopic>odom</odometryTopic>
+        <odometryFrame>odom</odometryFrame>
+        <odometryRate>20.0</odometryRate>
+        <robotBaseFrame>base_link</robotBaseFrame>
+      </plugin>
+    </gazebo>
+
+  </robot>
+  ```
+
+  - the term **sensor** describes a physical [sensor](http://gazebosim.org/tutorials?cat=sensors) that is used to read laserscans into the robot, providing information on the environment.
+  - the term **plugin** provides functionality for the robot, connecting sensor input & messages to motor output! Read more on it [here](http://gazebosim.org/tutorials?tut=ros_gzplugins).
+
+Now, lets create a launch file to see your very own robot in action!
+
+```bash
+cd ~/sim_ws/src/navigation_robot/launch
+```
+
+- Paste the following into `world.launch`:
+
+  ```xml
+  <?xml version="1.0" encoding="UTF-8" ?>
+
+  <launch>
+      <arg name="debug" default="false" />
+      <arg name="gui" default="true" />
+      <arg name="pause" default="false" />
+      <arg name="world" default="$(find navigation_robot)/world/empty_world.world" />
+
+      <!-- include gazebo_ros launcher -->
+      <include file="$(find gazebo_ros)/launch/empty_world.launch">
+          <arg name="world_name" value="$(arg world)" />
+          <arg name="debug" value="$(arg debug)" />
+          <arg name="gui" value="$(arg gui)" />
+          <arg name="paused" value="$(arg pause)" />
+          <arg name="use_sim_time" value="true" />
+      </include>
+
+      <!-- set params -->
+      <param name="robot_description" command="$(find xacro)/xacro --inorder $(find navigation_robot)/urdf/robot.xacro" />
+
+      <!-- rviz state values -->
+      <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
+
+      <!-- rviz joint values -->
+      <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
+          <param name="use_gui" value="False"/>
+      </node>
+
+      <!-- rviz -->
+      <node name="rviz" pkg="rviz" type="rviz" args="-d $(find navigation_robot)/launch/config.rviz"/>
+
+      <!-- spawn in gazebo -->
+      <node name="robot_spawn" pkg="gazebo_ros" type="spawn_model" output="screen"
+          args="-urdf -param robot_description -model iris_model -x 0 -y 0 -z 0.5" />
+
+  </launch>
+  ```
+
+  - **robot_description** loads the robot xacro into _Rviz_ and _Gazebo_.
+  - **x_state_publisher** stabilizes the links and joints of the robot in ROS using [transformers](http://wiki.ros.org/tf).
+
+Its time, launch your work!
+
+```bash
+roslaunch navigation_robot world.launch
+```
+
+![custom_robot_rviz](images/custom_robot_rviz.png)
+![custom_robot_gazebo](images/custom_robot_gazebo.png)
 
 ---
 
@@ -488,3 +645,5 @@ For the localization simulation, its available in docker also!
   ```
   > _Please do be patient when loading Gazebo, as it will take a bit of time due to it being a graphical client._
 - Now you can send it `Goals` using Rviz, and the robot will configure a path to get to the given destination goal!
+
+## Navigating through environment
