@@ -604,7 +604,7 @@ cd ~/sim_ws/src/navigation_robot/launch
 
       <!-- spawn in gazebo -->
       <node name="robot_spawn" pkg="gazebo_ros" type="spawn_model" output="screen"
-          args="-urdf -param robot_description -model iris_model -x 0 -y 0 -z 0.5" />
+          args="-urdf -param robot_description -model navigation_robot -x 0 -y 0 -z 0.5" />
 
   </launch>
   ```
@@ -646,4 +646,123 @@ For the localization simulation, its available in docker also!
   > _Please do be patient when loading Gazebo, as it will take a bit of time due to it being a graphical client._
 - Now you can send it `Goals` using Rviz, and the robot will configure a path to get to the given destination goal!
 
-## Navigating through environment
+## Mapping the environment
+
+Currently, we have a working custom robot and environment. Lets make the robot feel like home with some mapping and localization!
+
+```bash
+cd ~/sim_ws/src/navigation_robot/launch
+touch gmapping.launch
+```
+
+- Paste the following into `gmapping.launch`:
+
+  ```xml
+  <?xml version="1.0" encoding="UTF-8" ?>
+
+  <launch>
+    <arg name="scan_topic"  default="/navigation_robot/laser/scan" />
+    <arg name="base_frame"  default="base_link"/>
+    <arg name="odom_frame"  default="odom"/>
+
+    <node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" output="screen">
+      <param name="base_frame" value="$(arg base_frame)"/>
+      <param name="odom_frame" value="$(arg odom_frame)"/>
+      <param name="map_update_interval" value="5.0"/>
+      <param name="maxUrange" value="6.0"/>
+      <param name="maxRange" value="8.0"/>
+      <param name="sigma" value="0.05"/>
+      <param name="kernelSize" value="1"/>
+      <param name="lstep" value="0.05"/>
+      <param name="astep" value="0.05"/>
+      <param name="iterations" value="5"/>
+      <param name="lsigma" value="0.075"/>
+      <param name="ogain" value="3.0"/>
+      <param name="lskip" value="0"/>
+      <param name="minimumScore" value="200"/>
+      <param name="srr" value="0.01"/>
+      <param name="srt" value="0.02"/>
+      <param name="str" value="0.01"/>
+      <param name="stt" value="0.02"/>
+      <param name="linearUpdate" value="0.5"/>
+      <param name="angularUpdate" value="0.436"/>
+      <param name="temporalUpdate" value="-1.0"/>
+      <param name="resampleThreshold" value="0.5"/>
+      <param name="particles" value="80"/>
+
+      <param name="xmin" value="-1.0"/>
+      <param name="ymin" value="-1.0"/>
+      <param name="xmax" value="1.0"/>
+      <param name="ymax" value="1.0"/>
+
+      <param name="delta" value="0.05"/>
+      <param name="llsamplerange" value="0.01"/>
+      <param name="llsamplestep" value="0.01"/>
+      <param name="lasamplerange" value="0.005"/>
+      <param name="lasamplestep" value="0.005"/>
+      <remap from="scan" to="$(arg scan_topic)"/>
+    </node>
+
+  </launch>
+  ```
+
+  > **gmapping** is one of many laser-based **SLAM** (Simultaneous Localization and Mapping) that provides the robot with a 2D occupancy grid that is used to map its environment for use at different stages, like localization.
+
+Moving on, to move the robot withing _Gazebo_, we would need a **controller** (like the `turtlebot_teleop_keyboard`). Lets do just that.
+
+```bash
+cd ~/sim_ws/src/navigation_robot
+mkdir scripts
+cd scripts
+sudo wget https://raw.githubusercontent.com/dlakhiani/iris_model/master/scripts/teleop_twist_key.py
+```
+
+- Lets not forget to make it an executable!
+  > `chmod +x teleop_twist_key.py`
+
+What you have just downloaded is the exact controller we used in the previous section of this tutorial, and we will use it again to control our own!
+
+```bash
+cd ~/sim_ws/src/navigation_robot/launch
+touch bringup_gmapping.launch
+```
+
+- Paste the following into `bringup_gmapping.launch`:
+
+  ```xml
+  <?xml version="1.0"?>
+  <launch>
+
+    <master auto="start"/>
+    <param name="/use_sim_time" value="true"/>
+
+    <include file="$(find navigation_robot)/launch/world.launch"></include>
+
+    <include file="$(find navigation_robot)/launch/gmapping.launch"></include>
+
+  </launch>
+  ```
+
+- Launch it!
+  ```bash
+  roslaunch navigation_robot world.launch
+  ```
+  ![robot_gmapping_rviz](images/robot_gmapping_rviz.png)
+  ![robot_gmapping_gazebo](images/robot_gmapping_gazebo.png)
+- And in another terminal, do this:
+  ```bash
+  rosrun navigation_robot teleop_twist_key.py
+  ```
+  ![teleop_twist_key](images/teleop_twist_key.png)
+
+Now map your environment, and save it using:
+
+```bash
+cd ~/sim_ws/src/navigation_robot
+mkdir maps
+rosrun map_server map_saver -f $(find navigation_robot)/maps/my_first_map
+```
+
+Congratulations! You have successfully saved your first map!
+
+## Navigating through the environment
